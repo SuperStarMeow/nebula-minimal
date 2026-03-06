@@ -1,0 +1,17 @@
+name: "Nebula Minimal"
+description: "a Nebula VPN Home Assistant app with minimalism in mind"
+version: "0.1.0"
+slug: "nebula-minimal"
+init:
+boot: "auto"
+map:
+  - addon_config:rw
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+host_network: true
+privileged:
+  - NET_ADMIN
