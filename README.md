@@ -45,3 +45,11 @@ docker run --rm --entrypoint nebula nebula-minimal -version
 
 CI runs these tests together with ShellCheck, Hadolint and an image build on
 every pull request and on `main`.
+
+## Maintenance
+
+The **Update Nebula versions** workflow runs every Monday. It adds every newly
+released Nebula version that ships the Linux assets this app supports to the
+`nebula_version` list and bundles the newest one into the image. Existing
+entries are kept so pinned versions keep working. The workflow only opens a
+pull request, nothing is merged automatically.
