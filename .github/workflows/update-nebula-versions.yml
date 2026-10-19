@@ -1,0 +1,93 @@
+name: Update Nebula versions
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Refresh available versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # A PAT is needed to push a branch that triggers CI and to open the
+          # pull request when the organization disallows GITHUB_TOKEN PRs.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Install yq
+        env:
+          YQ_VERSION: v4.54.1
+        run: |
+          sudo curl -fsSL -o /usr/local/bin/yq \
+            "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64"
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Resolve released versions
+        id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Only offer releases that ship the assets used by every supported architecture.
+          released="$(gh api --paginate repos/slackhq/nebula/releases --jq '
+            .[]
+            | select(.draft | not)
+            | select(.prerelease | not)
+            | select([.assets[].name] | contains([
+                "nebula-linux-amd64.tar.gz",
+                "nebula-linux-arm64.tar.gz",
+                "nebula-linux-arm-6.tar.gz",
+                "nebula-linux-386.tar.gz"
+              ]))
+            | .tag_name
+          ' | sed -n 's/^v//p' | grep -Ex '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+
+          if [[ -z "${released}" ]]; then
+            echo "No usable Nebula releases found" >&2
+            exit 1
+          fi
+
+          # Keep already listed versions so pinned configurations stay valid.
+          existing="$(yq '.schema.nebula_version' addon/config.yaml \
+            | sed -E 's/^list\((.*)\)$/\1/' | tr '|' '\n' \
+            | grep -Ex '[0-9]+\.[0-9]+\.[0-9]+' || true)"
+
+          merged="$(printf '%s\n%s\n' "${released}" "${existing}" | sort -uVr)"
+
+          {
+            echo "latest=$(printf '%s\n' "${merged}" | head -n1)"
+            echo "list=latest|$(printf '%s\n' "${merged}" | paste -sd'|' -)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update configuration
+        env:
+          NEBULA_LIST: ${{ steps.versions.outputs.list }}
+          NEBULA_LATEST: ${{ steps.versions.outputs.latest }}
+        run: |
+          yq -i '.schema.nebula_version = "list(" + strenv(NEBULA_LIST) + ")"' addon/config.yaml
+          sed -i "s|^ARG NEBULA_VERSION=.*|ARG NEBULA_VERSION=${NEBULA_LATEST}|" addon/Dockerfile
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          branch: chore/update-nebula-versions
+          add-paths: |
+            addon/config.yaml
+            addon/Dockerfile
+          commit-message: "chore(nebula): update available versions to ${{ steps.versions.outputs.latest }}"
+          title: "chore(nebula): update available versions to ${{ steps.versions.outputs.latest }}"
+          body: |
+            Refresh the `nebula_version` list with the latest
+            [Nebula releases](https://github.com/slackhq/nebula/releases) and
+            bundle `${{ steps.versions.outputs.latest }}` into the image.
+
+            Versions that are no longer published upstream are kept in the list
+            so configurations pinned to them keep working.
+          delete-branch: true
