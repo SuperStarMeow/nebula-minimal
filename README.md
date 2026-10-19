@@ -53,3 +53,24 @@ released Nebula version that ships the Linux assets this app supports to the
 `nebula_version` list and bundles the newest one into the image. Existing
 entries are kept so pinned versions keep working. The workflow only opens a
 pull request, nothing is merged automatically.
+
+## Releases
+
+[Conventional Commits](https://www.conventionalcommits.org/) drive the release
+process:
+
+- The **Lint PR** workflow validates pull request titles. Merge pull requests
+  with squash merge, so the validated title becomes the commit on `main`.
+- [release-please](https://github.com/googleapis/release-please) keeps a release
+  pull request open on `main`. It bumps the app version in
+  [addon/config.yaml](./addon/config.yaml) and [version.txt](./version.txt) and
+  writes [CHANGELOG.md](./CHANGELOG.md) from the commit messages.
+- Merging the release pull request creates the `vX.Y.Z` tag and GitHub release.
+
+Both the release and the version update workflows need a token that is allowed
+to open pull requests. Add a fine-grained personal access token with *Contents*
+and *Pull requests* write access as the `RELEASE_PLEASE_TOKEN` repository secret.
+Without it the workflows fall back to `GITHUB_TOKEN`, which only works when the
+organization allows GitHub Actions to create pull requests. Pull requests opened
+with a personal access token also trigger the CI workflow, while `GITHUB_TOKEN`
+pull requests do not.
