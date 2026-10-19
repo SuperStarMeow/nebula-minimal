@@ -29,3 +29,19 @@ Selecting any other version downloads that release from
 time the app starts with that selection. Downloads are checksum-verified and
 cached in the app's private `/data` volume, so later starts work offline. The
 `nebula-cert` binary of the selected version is installed next to `nebula`.
+
+## Development
+
+The tests need Docker, bash and Python 3 with [PyYAML](https://pypi.org/project/PyYAML/).
+
+```bash
+# Unit tests for the version handling plus configuration checks
+./tests/run.sh
+
+# Build the image the same way CI does and check the bundled binary
+docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22 -t nebula-minimal addon
+docker run --rm --entrypoint nebula nebula-minimal -version
+```
+
+CI runs these tests together with ShellCheck, Hadolint and an image build on
+every pull request and on `main`.
