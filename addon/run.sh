@@ -1,10 +1,16 @@
 #!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+
+set -e
 
 # create a file to create a config directory if it doesn't exist
 touch /config/.tmp
 
-echo "Nebula $(nebula --version)"
+NEBULA_VERSION="$(bashio::config 'nebula_version' 'latest')"
+NEBULA_BIN="$(select-nebula.sh "${NEBULA_VERSION}")"
 
-nebula -test -config /config/nebula0.yaml
+echo "Nebula $("${NEBULA_BIN}" -version)"
 
-nebula -config /config/nebula0.yaml
+"${NEBULA_BIN}" -test -config /config/nebula0.yaml
+
+exec "${NEBULA_BIN}" -config /config/nebula0.yaml
